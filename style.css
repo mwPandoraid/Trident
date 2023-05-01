@@ -1,4 +1,7 @@
+
+
 body{
+    -ms-overflow-style: none;
     background-color: #11151C;
     color: #EEEEEE;
     margin: 0;
@@ -10,8 +13,10 @@ body{
     position:absolute;
     background-color: #364156;
     height: 100vh;
+    max-height: 100vh;
     width: 30vh;
     padding-left: 0;
+
 }
 
 #logo {
@@ -20,14 +25,36 @@ body{
     height: 50px;
 }
 
+#anilist {
+    background-color: #212d40;
+    height: 90vh;
+    overflow-y: scroll;
+}
+
 #bottombar {
-    position:absolute;
     background-color: #212d40;
     width: 100%;
+    min-height: 50px;
     height: 50px;
     bottom: 0;
 }
 
 #logo div{
     float:right;
+}
+
+#menubutton {
+    all: unset;
+    width:100%;
+    height:50px;
+    background-color: #2F2F2F;
+    border: 1px solid #11151C;
+    text-align:center;
+}
+#menubutton:hover{
+    background-color: #364156;
+}
+
+#anilist::-webkit-scrollbar{
+    display: none;
 }
