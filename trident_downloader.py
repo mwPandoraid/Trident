@@ -20,8 +20,10 @@ def update():
             if anime["quality"] in episode["name"] and episode["id"] not in str(anime["downloaded"]):
                 print(episode["magnet"])
                 qb.download_from_link(episode["magnet"])
-                anime["downloaded"].append({"id": episode["id"], "name": episode["name"], "status": "downloading"})
+                anime["downloaded"].append({"id": episode["id"], "name": episode["name"], "status": "Unwatched"})
 
 
     with open('anilist.json', 'w') as outfile:
         json.dump(anilist, outfile)
+
+update()
