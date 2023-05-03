@@ -8,6 +8,7 @@ html, body{
     height:100%;
     width:100%;
     overflow:hidden;
+    font-family: sans-serif
 }
 
 #menu {
@@ -62,7 +63,7 @@ html, body{
     border: 1px solid #11151C;
     text-align:center;
 }
-#menubutton:hover{
+#menubutton:hover, #menubutton:focus{
     background-color: #364156;
 }
 
@@ -76,10 +77,40 @@ html, body{
     width:80%;
     background-color: #11151C;
     height:90%;
-    min-width:85%;
+    min-width:70%;
     min-height:90%;
     position:absolute;
     overflow:auto;
+}
+
+#deletebutton {
+    float: right;
+    position: fixed;
+    right: 0;
+    margin: 20px;
+}
+
+#downloadbutton {
+    float: right;
+    position: relative;
+    height: 100%;
+}
+
+#closeepanel {
+    float:right;
+    height:2%;
+    margin: 10px;
+}
+
+#episodepanel {
+    width:20%;
+    float: right;
+    position:relative;
+    height:100%;
+    min-height:100%;
+    background-color: #2F2F2F;
+    display:none;
+    padding: 25px;
 }
 
 #content::-webkit-scrollbar{
@@ -128,6 +159,10 @@ input::-webkit-file-upload-button:hover, input::-webkit-file-upload-button:focus
     margin-top: 75px;
     margin-left: 25px;
     text-align: center;
+}
+
+#episodebox:hover{
+    background-color: #616f9e;
 }
 
 #episode{
