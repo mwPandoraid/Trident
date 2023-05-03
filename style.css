@@ -87,19 +87,39 @@ html, body{
     float: right;
     position: fixed;
     right: 0;
-    margin: 20px;
+    margin-right: 50px;
+    margin-top: 5px;
+    height: 40px;
+}
+
+#animesettingsbutton {
+    float:right;
+    position: fixed;
+    right: 0;
+    margin-right: 100px;
+    margin-top: 5px;
+    height: 40px;
 }
 
 #downloadbutton {
-    float: right;
-    position: relative;
-    height: 100%;
+    float:right;
+    position: fixed;
+    right: 0;
+    margin-top: 5px;
+    height: 40px;
+    
 }
 
 #closeepanel {
     float:right;
     height:2%;
     margin: 10px;
+}
+
+#deleteepisode {
+    float:left;
+    height:5%;
+    margin: 4px;
 }
 
 #episodepanel {
@@ -159,6 +179,7 @@ input::-webkit-file-upload-button:hover, input::-webkit-file-upload-button:focus
     margin-top: 75px;
     margin-left: 25px;
     text-align: center;
+    padding: 10px;
 }
 
 #episodebox:hover{
@@ -170,4 +191,10 @@ input::-webkit-file-upload-button:hover, input::-webkit-file-upload-button:focus
     margin-left: auto;
     margin-right: auto;
     max-height: 250px;
+    padding: 10px;
+}
+
+#lastupdated { 
+    float:left;
+    margin: 4px;
 }
