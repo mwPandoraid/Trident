@@ -89,19 +89,27 @@ def update():
 
 
 def update_downloaded():
-    for infohash, animinfo in downloading.items():
-        torrent = qb.get_torrent(infohash)
-        if(torrent["completion_date"] != -1): #for some reason im not getting the "amount_left" field here, i'll just use completion_date instead
-            anilist["animes"][animinfo["animeindex"]]["downloaded"].append(animinfo)
-            qb.delete(torrent["infohash_v1"])
-            downloading.pop(infohash)
-            print("Finished and cleared torrent " + torrent["infohash_v1"])
+    try:
+        moved = [] #placeholder for moved torrents, can't remove them in the for loop because you can't change dict mid loop
+        for infohash, animinfo in downloading.items():
+            torrent = qb.get_torrent(infohash)
+            if(torrent["completion_date"] != -1): #for some reason im not getting the "amount_left" field here, i'll just use completion_date instead
+                anilist["animes"][animinfo["animeindex"]]["downloaded"].append(animinfo)
+                qb.delete(torrent["infohash_v1"])
+                moved.append(infohash)
+                print("Finished and cleared torrent " + torrent["infohash_v1"])
 
-    with open('downloading.json', 'w') as outfile:
-        json.dump(downloading, outfile)
+        for movedtorrent in moved:
+            downloading.pop(movedtorrent)
 
-    with open('anilist.json', 'w') as outfile:
-        json.dump(anilist, outfile)
+        with open('downloading.json', 'w') as outfile:
+            json.dump(downloading, outfile)
+
+        with open('anilist.json', 'w') as outfile:
+            json.dump(anilist, outfile)
+    except Exception as e:
+        print(e)
+
 
 
 def clean_placeholders(createdcategories):

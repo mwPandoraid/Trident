@@ -101,6 +101,9 @@ html, body{
     height: 40px;
 }
 
+
+
+
 #downloadbutton {
     float:right;
     position: fixed;
@@ -197,4 +200,16 @@ input::-webkit-file-upload-button:hover, input::-webkit-file-upload-button:focus
 #lastupdated { 
     float:left;
     margin: 4px;
+}
+
+#settingsbutton {
+    float:right;
+    margin-top: 5px;
+    height: 40px;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
