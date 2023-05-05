@@ -1,8 +1,6 @@
 from NyaaPy.nyaa import Nyaa
 from qbittorrent import Client
 import json
-import os
-import requests
 from datetime import datetime
 
 
