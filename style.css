@@ -195,6 +195,7 @@ input::-webkit-file-upload-button:hover, input::-webkit-file-upload-button:focus
     margin-right: auto;
     max-height: 250px;
     padding: 10px;
+    max-width: 200px;
 }
 
 #lastupdated { 

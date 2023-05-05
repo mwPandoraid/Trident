@@ -1,7 +1,6 @@
 from NyaaPy.nyaa import Nyaa
 from qbittorrent import Client
 import json
-import time
 import os
 import requests
 from datetime import datetime
@@ -41,13 +40,11 @@ def update():
                 filtered = False
                 for filterword in anime["filter"]:
                     if filterword in episode["name"]:
-                        print("Filtered episode with filter: " + filterword)
                         filtered = True
                         break
                 unfulfilled = False        
                 for keyword in anime["require"]:
                     if keyword not in episode["name"]:
-                        print("Episode did not fulfill requirement: " + keyword)
                         unfulfilled = True
                         break
 
@@ -59,27 +56,22 @@ def update():
                 path = anilist["path"] + "\\" + anime["fullname"]
                 qb.download_from_link(episode["magnet"], savepath=path, category=episode["name"])  #we create the category here so we can easily access the filename
                 createdcategories.append(episode["name"])
+                torrents = qb.torrents(category=episode["name"])
+                infohashes.append(torrents[0]["infohash_v1"])
 
-                # wait for qbittorrent to finalize setting up the torrent before trying to get any data, this takes quite a long while sometimes sadly but it also makes sure we don't get ratelimited by nyaa.si
+                #Wait for the metadata to finish downloading so we can get torrent files.
+                while qb.torrents(category=episode["name"])[0]["state"] == "metaDL":
+                    pass
 
-
-                time.sleep(5)
-
-                try:
-                    torrents = qb.torrents(category=episode["name"])
-                    print(torrents[0]["infohash_v1"])
-                    print(filtered)
-                    infohashes.append(torrents[0]["infohash_v1"])
-
-                
-                    filename = qb.get_torrent_files(torrents[0]["infohash_v1"])[0]['name']
-
-                    print(filename)
-
-                    downloading[torrents[0]["infohash_v1"]] = {"id": episode["id"], "name": filename, "path": path, "watched": False, "animeindex": index}
-                except IndexError:
-                    print("[ERROR] Failed to add torrent - this could be due to a duplicate. Make sure to delete any old torrents from qbittorrent.")
-                    continue
+                filename = qb.get_torrent_files(torrents[0]["infohash_v1"])
+                            
+                filename = filename[0]['name']
+ 
+                print("Added torrent to downloading.json: " + filename)
+                downloading[torrents[0]["infohash_v1"]] = {"id": episode["id"], "name": filename, "path": path, "watched": False, "animeindex": index}
+                        
+                print(f"Failed to add torrent.")
+                continue
 
                          #anime["updated"] = True
                 #anime["downloaded"].append({"id": episode["id"], "name": filename, "path": path, "watched": False})
@@ -97,7 +89,7 @@ def update_downloaded():
                 anilist["animes"][animinfo["animeindex"]]["downloaded"].append(animinfo)
                 qb.delete(torrent["infohash_v1"])
                 moved.append(infohash)
-                print("Finished and cleared torrent " + torrent["infohash_v1"])
+                print("Finished and cleared torrent " + animinfo["name"])
 
         for movedtorrent in moved:
             downloading.pop(movedtorrent)
@@ -115,7 +107,6 @@ def update_downloaded():
 def clean_placeholders(createdcategories):
     print("Cleaning placeholder categories...")
     for category in createdcategories:
-        print(category)
         qb.remove_category(category)
 
 
@@ -129,16 +120,6 @@ def move_trident(infohashes):
 
     qb.set_category(infohashes, "trident")
 
-
-def clear_finished():
-    print("Clearing finished torrents.")
-    torrents = qb.torrents(category="trident")
-    for torrent in torrents:
-        if(torrent["amount_left"] == 0):
-            qb.delete(torrent["infohash_v1"])
-            print("Cleared torrent " + torrent["infohash_v1"])
-
-#clear_finished()
 update()
 clean_placeholders(createdcategories)
 move_trident(infohashes)

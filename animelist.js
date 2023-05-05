@@ -9,24 +9,29 @@ const { ToadScheduler, SimpleIntervalJob, Task } = require('toad-scheduler')
 
 const scheduler = new ToadScheduler()
 
+var updaterRunning = false
+
 //TODO: create a fetch function that will be used to grab things from the anilist file instead of using fs in every function
 setUpdateInfo()
 
 const task = new Task('downloader', () => {
-    console.log("Running task.")
-    var python = spawn("python3", ['trident_downloader.py']);
-    python.stdout.on('data', function (data) {
-        console.log('Pipe data from python script ...');
-        dataToSend = data.toString();
-    });
+    if(!updaterRunning){
+        updaterRunning = true
+        console.log("Running task.")
+        var python = spawn("python3", ['trident_downloader.py']);
+        python.stdout.on('data', function (data) {
+            console.log('Pipe data from python script ...');
+            dataToSend = data.toString();
+        });
+    } else { console.log("Updater script still running. Skipping update. ")}
     python.on('close', (code) => {
-        console.log(dataToSend); 5
+        console.log(dataToSend);
+        updaterRunning = false
         setUpdateInfo()
     })
 })
-const job = new SimpleIntervalJob({ minutes: 1 }, task)
+const job = new SimpleIntervalJob({ minutes: parseInt(fetchSetting("update_interval")) }, task)
 
-console.log(fetchSetting("update_interval"))
 
 scheduler.addSimpleIntervalJob(job)
 
@@ -447,12 +452,19 @@ function displayAppSettings() {
     password.value = fetchSetting("qbittorrent_password")
     interval.value = parseInt(fetchSetting("update_interval"))
 
+    
+
     let button = document.getElementsByName("submit")[0]
     button.addEventListener("click", () => {
+
+        if (interval.value == 0) {
+            interval.value += 1;
+        }
+
         changeSetting("qbittorrent_address", address.value)
         changeSetting("qbittorrent_port", port.value)
         changeSetting("qbittorrent_login", login.value)
         changeSetting("qbittorrent_password", password.value)
-        changeSetting("update_interval", interval.value)
+        changeSetting("update_interval", Math.ceil(interval.value))
     })
 }
