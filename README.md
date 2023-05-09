@@ -16,6 +16,10 @@ Trident is an anime library app designed to keep all of your series up to date u
 
 * Design a proper logo
 
+* Allow users to download batch torrents
+
+* Rewrite the downloader to JS
+
 
 
 
