@@ -1,6 +1,6 @@
 const electron = require('electron');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
 const api = require('qbittorrent-api-v2')
 const shell = require('electron').shell;
 const { spawn } = require('child_process');
@@ -15,7 +15,7 @@ var updaterRunning = false
 setUpdateInfo()
 
 const task = new Task('downloader', () => {
-    if(!updaterRunning){
+    if (!updaterRunning) {
         updaterRunning = true
         console.log("Running task.")
         var python = spawn("python3", ['trident_downloader.py']);
@@ -23,74 +23,80 @@ const task = new Task('downloader', () => {
             console.log('Pipe data from python script ...');
             dataToSend = data.toString();
         });
-    } else { console.log("Updater script still running. Skipping update. ")}
+    } else { console.log("Updater script still running. Skipping update. ") }
     python.on('close', (code) => {
         console.log(dataToSend);
         updaterRunning = false
         setUpdateInfo()
     })
 })
-const job = new SimpleIntervalJob({ minutes: parseInt(fetchSetting("update_interval")) }, task)
 
 
-scheduler.addSimpleIntervalJob(job)
+async function startJob() {
+    let interval = await fetchSetting("update_interval")
 
-function setUpdateInfo() {
-    fs.readFile('anilist.json', function (err, data) {
-        var json = JSON.parse(data)
+    const job = new SimpleIntervalJob({ minutes: parseInt(interval) }, task)
 
-        let time = json["last-updated"]
 
-        let info = document.getElementById("lastupdated")
-        info.innerHTML = `Last updated: ${time}`
-    })
+    scheduler.addSimpleIntervalJob(job)
 }
 
-function fetchSetting(settingname) {
-    const settings = fs.readFileSync('settings.json', { encoding: 'utf8' })
+startJob()
+
+
+async function setUpdateInfo() {
+    var data = await fs.readFile('anilist.json')
+    var json = JSON.parse(data)
+
+    let time = json["last-updated"]
+
+    let info = document.getElementById("lastupdated")
+    info.innerHTML = `Last updated: ${time}`
+}
+
+async function fetchSetting(settingname) {
+    const settings = await fs.readFile('settings.json', { encoding: 'utf8' })
     var json = JSON.parse(settings)
     return json[settingname]
 
 }
 
-function changeSetting(settingname, value){
-    const settings = fs.readFileSync('settings.json', { encoding: 'utf8' })
+async function changeSetting(settingname, value) {
+    const settings = await fs.readFile('settings.json', { encoding: 'utf8' })
     var json = JSON.parse(settings)
     json[settingname] = value
 
-    fs.writeFileSync('settings.json', JSON.stringify(json))
+    await fs.writeFile('settings.json', JSON.stringify(json))
 }
 
-function listAnime() {
+async function listAnime() {
 
     document.getElementById("anilist").innerHTML = ""
-    fs.readFile('anilist.json', function (err, data) {
-        try {
-            var json = JSON.parse(data)
+    var data = await fs.readFile('anilist.json')
+    try {
+        var json = JSON.parse(data)
 
-            for (let i = 0; i < json["animes"].length; i++) {
-                var button = document.createElement('button');
-                button.id = "menubutton"
-                console.log(json["animes"][i])
-                if (json["animes"][i]["updated"]) {
-                    button.style.backgroundColor = "#364156";
-                }
-                button.name = i;
-                button.innerHTML = json["animes"][i]["fullname"];
-                button.onclick = function () { displayAnimeEpisodes(i) }
-                document.getElementById("anilist").appendChild(button)
+        for (let i = 0; i < json["animes"].length; i++) {
+            var button = document.createElement('button');
+            button.id = "menubutton"
+            console.log(json["animes"][i])
+            if (json["animes"][i]["updated"]) {
+                button.style.backgroundColor = "#364156";
             }
-        } catch (error) {
-            console.log("No JSON file found.")
+            button.name = i;
+            button.innerHTML = json["animes"][i]["fullname"];
+            button.onclick = function () { displayAnimeEpisodes(i) }
+            document.getElementById("anilist").appendChild(button)
         }
+    } catch (error) {
+        console.log("No JSON file found.")
+    }
 
-        var button = document.createElement('button');
-        button.id = "menubutton"
-        button.innerHTML = "+"
-        button.onclick = addAnimeMenu
-        document.getElementById("anilist").appendChild(button)
-
-    })
+    var button = document.createElement('button');
+    button.id = "menubutton"
+    button.innerHTML = "+"
+    button.onclick = addAnimeMenu
+    document.getElementById("anilist").appendChild(button)
 
 }
 
@@ -113,7 +119,7 @@ function addAnimeMenu() {
     button.addEventListener("click", addAnimeToList)
 }
 
-function addAnimeToList() {
+async function addAnimeToList() {
 
     let name = document.getElementsByName("name")[0].value
     let searchword = document.getElementsByName("searchword")[0].value
@@ -122,86 +128,76 @@ function addAnimeToList() {
     let filter = document.getElementsByName("filter")[0].value;
     let require = document.getElementsByName("require")[0].value;
 
-    fs.readFile('anilist.json', function (err, data) {
-        try {
-            var json = JSON.parse(data)
-        } catch (error) {
-            var jsonstr = `
-            {
-                "last_updated": "",
-                "path": "${path.normalize(__dirname).replace(/\\/g, "\\\\")}",
-                "animes": []
-            }`
-            console.log(jsonstr)
-            var json = JSON.parse(jsonstr)
-        }
-        console.log(json)
-        let filterlist = ""
-        if (filter.length !== 0) {
-            filterlist = filter.split(",")
-        } else {
-            filterlist = []
-        }
-
-        let requirelist = ""
-        if (require.length !== 0) {
-            requirelist = require.split(',')
-        } else {
-            requirelist = []
-        }
-
-        console.log(filterlist)
-        console.log(requirelist)
-
-        json["animes"].push({
-            "searchword": searchword,
-            "filter": filterlist,
-            "require": requirelist,
-            "fullname": name,
-            "quality": "1080p",
-            "downloaded": [],
-            "logopath": logo,
-            "updated": false
-        })
-        console.log(json["animes"])
-        fs.writeFile("anilist.json", JSON.stringify(json), function (err) {
-            if (err) throw err;
-            console.log('Submitted new anime.');
-            document.getElementById("anilist").innerHTML = ""
-
-            listAnime()
-        });
-    })
-
-}
-
-function deleteEpisode(index, animindex) {
-    fs.readFile('anilist.json', function (err, data) {
+    var data = await fs.readFile('anilist.json')
+    try {
         var json = JSON.parse(data)
+    } catch (error) {
+        var json =
+        {
+            "last_updated": "",
+            "path": `${path.normalize(__dirname).replace(/\\/g, "\\\\")}`,
+            "animes": []
+        }
+        console.log(jsonstr)
+    }
+    console.log(json)
+    let filterlist = []
+    
+    if (filter.length !== 0) {
+        filterlist = filter.split(",")
+    }
 
-        episodes = json["animes"][animindex]["downloaded"]
-        console.log(episodes)
-        episodes.splice(index, 1)
+    let requirelist = []
 
-        fs.writeFile("anilist.json", JSON.stringify(json), function (err) {
-            if (err) throw err;
-            console.log('Removed episode from list.');
-            displayAnimeEpisodes(animindex);
-            hideEpisodePanel();
-        });
+    if (require.length !== 0) {
+        requirelist = require.split(',')
+    } 
+
+    console.log(filterlist)
+    console.log(requirelist)
+
+    json["animes"].push({
+        "searchword": searchword,
+        "filter": filterlist,
+        "require": requirelist,
+        "fullname": name,
+        "quality": "1080p",
+        "downloaded": [],
+        "logopath": logo,
+        "updated": false
     })
+    console.log(json["animes"])
+    await fs.writeFile("anilist.json", JSON.stringify(json))
+    console.log('Submitted new anime.');
+    document.getElementById("anilist").innerHTML = ""
+
+    listAnime();
 }
 
-function displayEpisodePanel(index, animindex) {
+async function deleteEpisode(index, animindex) {
+    var data = await fs.readFile('anilist.json')
+    var json = JSON.parse(data)
+
+    episodes = json["animes"][animindex]["downloaded"]
+    console.log(episodes)
+    episodes.splice(index, 1)
+
+    await fs.writeFile("anilist.json", JSON.stringify(json))
+    console.log('Removed episode from list.');
+    displayAnimeEpisodes(animindex);
+    hideEpisodePanel();
+}
+
+async function displayEpisodePanel(index, animindex) {
     var episodePanel = document.getElementById("episodepanel")
 
-    fs.readFile('anilist.json', function (err, data) {
-        var json = JSON.parse(data)
-        console.log(json)
-        animeinfo = json["animes"][animindex]
-        episodeinfo = animeinfo["downloaded"][index]
+    var data = await fs.readFile('anilist.json')
+    var json = JSON.parse(data)
+    console.log(json)
+    animeinfo = json["animes"][animindex]
+    episodeinfo = animeinfo["downloaded"][index]
 
-        episodePanel.innerHTML = `
+    episodePanel.innerHTML = `
         <img id="closeepanel" src="close-icon.png" onclick="hideEpisodePanel()">
         <img id="deleteepisode" src="trash.png" onclick="deleteEpisode(${index}, ${animindex})">
         <br></br>
@@ -211,18 +207,15 @@ function displayEpisodePanel(index, animindex) {
         <label> Watched: <input type=checkbox id="checkbox" name="watched"> </label>
         `
 
-        let watched = document.getElementsByName("watched")[0]
+    let watched = document.getElementsByName("watched")[0]
 
-        watched.checked = episodeinfo["watched"]
+    watched.checked = episodeinfo["watched"]
 
-        watched.addEventListener('change', function () {
-            episodeinfo["watched"] = this.checked
-            fs.writeFile("anilist.json", JSON.stringify(json), function (err) {
-                if (err) throw err;
-                console.log('Updated episode watched status.');
-            });
-        })
-    })
+    watched.addEventListener('change', async function () {
+        episodeinfo["watched"] = this.checked
+        await fs.writeFile("anilist.json", JSON.stringify(json))
+        console.log('Updated episode watched status.');
+    });
 
 
     episodePanel.style.display = "block"
@@ -240,20 +233,17 @@ function hideEpisodePanel() {
 }
 
 
-function deleteAnime(index) {
-    fs.readFile('anilist.json', function (err, data) {
-        var json = JSON.parse(data)
-        console.log(json)
-        animes = json["animes"]
-        animes.splice(index, 1);
-        fs.writeFile("anilist.json", JSON.stringify(json), function (err) {
-            if (err) throw err;
-            console.log('Removed an anime.');
+async function deleteAnime(index) {
+    var data = await fs.readFile('anilist.json')
+    var json = JSON.parse(data)
+    console.log(json)
+    animes = json["animes"]
+    animes.splice(index, 1);
+    await fs.writeFile("anilist.json", JSON.stringify(json))
+    console.log('Removed an anime.');
 
 
-            listAnime()
-        });
-    })
+    listAnime()
 }
 
 async function displayTorrentMenu() {
@@ -292,7 +282,7 @@ async function displayTorrentMenu() {
 }
 
 //this entire function was coded while drunk so forgive me
-function displaySettingsAnime(index) {
+async function displaySettingsAnime(index) {
 
     document.getElementById("content").innerHTML = `
     <h1>Settings for <span id="animename"></span></h1>
@@ -313,120 +303,114 @@ function displaySettingsAnime(index) {
     let headerspan = document.getElementById("animename");
 
 
-    fs.readFile('anilist.json', function (err, data) {
-        var json = JSON.parse(data)
-        animeinfo = json["animes"][index]
+    var data = await fs.readFile('anilist.json')
+    var json = JSON.parse(data)
+    animeinfo = json["animes"][index]
 
-        searchword.value = animeinfo["searchword"]
-        filter.value = animeinfo["filter"]
-        require.value = animeinfo["require"]
-        name.value = animeinfo["fullname"]
-        headerspan.innerText = name.value;
+    searchword.value = animeinfo["searchword"]
+    filter.value = animeinfo["filter"]
+    require.value = animeinfo["require"]
+    name.value = animeinfo["fullname"]
+    headerspan.innerText = name.value;
 
-        let button = document.getElementsByName("submit")[0];
-        button.addEventListener("click", () => {
+    let button = document.getElementsByName("submit")[0];
+    button.addEventListener("click", async () => {
 
-            console.log("clicked")
+        console.log("clicked")
 
-            let filterlist = ""
-            if (filter.length !== 0) {
-                filterlist = filter.value.split(",")
-            } else {
-                filterlist = []
-            }
+        let filterlist = ""
+        if (filter.length !== 0) {
+            filterlist = filter.value.split(",")
+        } else {
+            filterlist = []
+        }
 
-            let requirelist = ""
-            if (require.length !== 0) {
-                requirelist = require.value.split(',')
-            } else {
-                requirelist = []
-            }
+        let requirelist = ""
+        if (require.length !== 0) {
+            requirelist = require.value.split(',')
+        } else {
+            requirelist = []
+        }
 
-            console.log(filterlist)
-            console.log(requirelist)
+        console.log(filterlist)
+        console.log(requirelist)
 
-            animeinfo["searchword"] = searchword.value;
-            animeinfo["filter"] = filterlist
-            animeinfo["require"] = requirelist
-            animeinfo["fullname"] = name.value
-            console.log(animeinfo)
-            if (logo.files[0] !== undefined) {
-                animeinfo["logopath"] = logo.files[0].path;
-            }
+        animeinfo["searchword"] = searchword.value;
+        animeinfo["filter"] = filterlist
+        animeinfo["require"] = requirelist
+        animeinfo["fullname"] = name.value
+        console.log(animeinfo)
+        if (logo.files[0] !== undefined) {
+            animeinfo["logopath"] = logo.files[0].path;
+        }
 
-            fs.writeFile("anilist.json", JSON.stringify(json), function (err) {
-                if (err) throw err;
-                console.log('Edited anime settings.');
-                listAnime()
-            });
+        await fs.writeFile("anilist.json", JSON.stringify(json))
+        console.log('Edited anime settings.');
+        listAnime()
 
 
-        })
     })
 }
 
-function displayAnimeEpisodes(index) {
+async function displayAnimeEpisodes(index) {
     document.getElementById("content").innerHTML = ""
 
-    fs.readFile('anilist.json', function (err, data) {
-        var json = JSON.parse(data)
+    var data = await fs.readFile('anilist.json')
+    var json = JSON.parse(data)
 
-        var head = document.createElement('h1');
+    var head = document.createElement('h1');
 
-        animinfo = json["animes"][index]
+    animinfo = json["animes"][index]
 
-        head.innerHTML = animinfo["fullname"]
-
-
-        var deleteButton = document.createElement('img')
-        deleteButton.id = "deletebutton"
-        deleteButton.src = "trash.png"
-        deleteButton.onclick = function () { deleteAnime(index) }
-
-        var settingsbutton = document.createElement('img');
-        settingsbutton.id = "animesettingsbutton"
-        settingsbutton.src = "anime-settings-icon.png"
-        settingsbutton.onclick = function () { displaySettingsAnime(index) }
-
-        var topdiv = document.createElement('div')
-
-        document.getElementById("bottombar").appendChild(deleteButton)
-        document.getElementById("bottombar").appendChild(settingsbutton)
-        topdiv.appendChild(head)
+    head.innerHTML = animinfo["fullname"]
 
 
-        document.getElementById("content").appendChild(topdiv)
-        for (let i = 0; i < animinfo["downloaded"].length; i++) {
-            var ep = document.createElement('div');
-            let filename = animinfo["downloaded"][i]["name"]
-            ep.id = "episodebox"
-            ep.name = i;
-            ep.innerHTML = `
+    var deleteButton = document.createElement('img')
+    deleteButton.id = "deletebutton"
+    deleteButton.src = "trash.png"
+    deleteButton.onclick = function () { deleteAnime(index) }
+
+    var settingsbutton = document.createElement('img');
+    settingsbutton.id = "animesettingsbutton"
+    settingsbutton.src = "anime-settings-icon.png"
+    settingsbutton.onclick = function () { displaySettingsAnime(index) }
+
+    var topdiv = document.createElement('div')
+
+    document.getElementById("bottombar").appendChild(deleteButton)
+    document.getElementById("bottombar").appendChild(settingsbutton)
+    topdiv.appendChild(head)
+
+
+    document.getElementById("content").appendChild(topdiv)
+    for (let i = 0; i < animinfo["downloaded"].length; i++) {
+        var ep = document.createElement('div');
+        let filename = animinfo["downloaded"][i]["name"]
+        ep.id = "episodebox"
+        ep.name = i;
+        ep.innerHTML = `
             <img id="episode" src="${animinfo["logopath"]}"></img>
             <p>${filename}</p>`;
 
-            var directory = animinfo["downloaded"][i]["path"]
-            if (!animinfo["downloaded"][i]["watched"]) {
-                ep.style.backgroundColor = "#364156"
-                console.log("Unwatched")
-            }
-            ep.onclick = function () { displayEpisodePanel(i, index) }
-            ep.ondblclick = function () { shell.openPath(path.join(directory, filename)) }
-
-            document.getElementById("content").appendChild(ep)
+        var directory = animinfo["downloaded"][i]["path"]
+        if (!animinfo["downloaded"][i]["watched"]) {
+            ep.style.backgroundColor = "#364156"
+            console.log("Unwatched")
         }
+        ep.onclick = function () { displayEpisodePanel(i, index) }
+        ep.ondblclick = function () { shell.openPath(path.join(directory, filename)) }
 
-        animinfo["updated"] = false;
+        document.getElementById("content").appendChild(ep)
+    }
 
-        fs.writeFile("anilist.json", JSON.stringify(json), function (err) {
-            if (err) throw err;
-            console.log('Changed updated status.');
-            listAnime();
-        });
-    })
+    animinfo["updated"] = false;
+
+    await fs.writeFile("anilist.json", JSON.stringify(json))
+    console.log('Changed updated status.');
+    listAnime();
 }
 
-function displayAppSettings() {
+async function displayAppSettings() {
     let content = document.getElementById("content");
 
     content.innerHTML = `
@@ -446,25 +430,26 @@ function displayAppSettings() {
     let password = document.getElementsByName("password")[0];
     let interval = document.getElementsByName("interval")[0];
 
-    address.value = fetchSetting("qbittorrent_address")
-    port.value = parseInt(fetchSetting("qbittorrent_port"))
-    login.value = fetchSetting("qbittorrent_login")
-    password.value = fetchSetting("qbittorrent_password")
-    interval.value = parseInt(fetchSetting("update_interval"))
+    address.value = await fetchSetting("qbittorrent_address")
+    port.value =  parseInt(await fetchSetting("qbittorrent_port"))
+    login.value = await fetchSetting("qbittorrent_login")
+    password.value = await fetchSetting("qbittorrent_password")
+    interval.value = parseInt(await fetchSetting("update_interval"))
 
-    
+    console.log(await fetchSetting("qbittorrent_password"))
+
 
     let button = document.getElementsByName("submit")[0]
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
 
         if (interval.value == 0) {
             interval.value += 1;
         }
 
-        changeSetting("qbittorrent_address", address.value)
-        changeSetting("qbittorrent_port", port.value)
-        changeSetting("qbittorrent_login", login.value)
-        changeSetting("qbittorrent_password", password.value)
-        changeSetting("update_interval", Math.ceil(interval.value))
+        await changeSetting("qbittorrent_address", address.value)
+        await changeSetting("qbittorrent_port", port.value)
+        await changeSetting("qbittorrent_login", login.value)
+        await changeSetting("qbittorrent_password", password.value)
+        await changeSetting("update_interval", Math.ceil(interval.value))
     })
 }
