@@ -4,8 +4,10 @@ const fs = require('fs').promises;
 const api = require('qbittorrent-api-v2')
 const shell = require('electron').shell;
 const { spawn } = require('child_process');
+const { si } = require('nyaapi')
 
-const { ToadScheduler, SimpleIntervalJob, Task } = require('toad-scheduler')
+const { ToadScheduler, SimpleIntervalJob, Task } = require('toad-scheduler');
+const { start } = require('repl');
 
 const scheduler = new ToadScheduler()
 
@@ -15,27 +17,40 @@ var updaterRunning = false
 setUpdateInfo()
 
 const task = new Task('downloader', () => {
+    startDownloader()
+})
+
+startDownloader()
+
+function startDownloader() {
+
     if (!updaterRunning) {
-        updaterRunning = true
+        updaterRunning = true;
         console.log("Running task.")
-        var python = spawn("python3", ['trident_downloader.py']);
+        let python = spawn("python3", ['trident_downloader.py']);
+        let refreshButton = document.getElementsByName("refreshbutton")[0];
+        refreshButton.style.animation = "rotation 2s infinite linear";
         python.stdout.on('data', function (data) {
             console.log('Pipe data from python script ...');
             dataToSend = data.toString();
         });
-    } else { console.log("Updater script still running. Skipping update. ") }
-    python.on('close', (code) => {
-        console.log(dataToSend);
-        updaterRunning = false
-        setUpdateInfo()
-    })
-})
+        python.on('close', (code) => {
+            console.log(dataToSend);
+            updaterRunning = false
+            refreshButton.style.animation = ""
+            setUpdateInfo()
+        })
+    }
 
+}
 
 async function startJob() {
     let interval = await fetchSetting("update_interval")
 
-    const job = new SimpleIntervalJob({ minutes: parseInt(interval) }, task)
+    const job = new SimpleIntervalJob({ minutes: parseInt(interval) },
+        task,
+        { preventOverrun: true }
+    );
 
 
     scheduler.addSimpleIntervalJob(job)
@@ -103,8 +118,9 @@ async function listAnime() {
 listAnime()
 console.log(__dirname)
 
-function addAnimeMenu() {
+async function addAnimeMenu() {
     document.getElementById("content").innerHTML = `
+        <div style="width: 40%; float: left">
         <h1>Entry:</h1>
         <label> Name: <input type="text" id="textbox" name="name"></input> </label>
         <label> Searchword: <input type="text" id="textbox" name="searchword"></input> </label>
@@ -113,10 +129,50 @@ function addAnimeMenu() {
         <label> Background (optional): <br><input type="file" name="image" accept="image/png, image/gif, image/jpeg"></input> </label>
         <br></br>
         <button id="textbox" name="submit">Submit</button>
+        <button id="textbox" name="check">Check</button>
+        </div>
     `
 
-    let button = document.getElementsByName("submit")[0];
-    button.addEventListener("click", addAnimeToList)
+    let submit = document.getElementsByName("submit")[0];
+    submit.addEventListener("click", addAnimeToList)
+
+    let check = document.getElementsByName("check")[0];
+    check.addEventListener("click", async () => {
+        console.log("Searching");
+        let searchword = document.getElementsByName("searchword")[0].value
+
+        let filter = document.getElementsByName("filter")[0].value;
+        let require = document.getElementsByName("require")[0].value;
+
+        let filterlist = []
+
+        if (filter.length !== 0) {
+            filterlist = filter.split(",")
+        }
+
+        let requirelist = []
+
+        if (require.length !== 0) {
+            requirelist = require.split(',')
+        }
+
+        let results = await nyaaResults(searchword, filterlist, requirelist)
+        console.log(results)
+        console.log(results.length)
+
+        let torrentbox = document.createElement("div")
+        torrentbox.className = "torrentbox"
+
+        results.forEach(result => {
+            let resultElement = document.createElement("p")
+            console.log(result["name"])
+            resultElement.innerText = result["name"]
+
+            torrentbox.appendChild(resultElement)
+        })
+
+        document.getElementById("content").appendChild(torrentbox)
+    })
 }
 
 async function addAnimeToList() {
@@ -135,14 +191,14 @@ async function addAnimeToList() {
         var json =
         {
             "last_updated": "",
-            "path": `${path.normalize(__dirname).replace(/\\/g, "\\\\")}`,
+            "path": `animes/${path.normalize(__dirname).replace(/\\/g, "\\\\")}`,
             "animes": []
         }
         console.log(jsonstr)
     }
     console.log(json)
     let filterlist = []
-    
+
     if (filter.length !== 0) {
         filterlist = filter.split(",")
     }
@@ -151,7 +207,7 @@ async function addAnimeToList() {
 
     if (require.length !== 0) {
         requirelist = require.split(',')
-    } 
+    }
 
     console.log(filterlist)
     console.log(requirelist)
@@ -171,6 +227,7 @@ async function addAnimeToList() {
     console.log('Submitted new anime.');
     document.getElementById("anilist").innerHTML = ""
 
+    startDownloader();
     listAnime();
 }
 
@@ -198,8 +255,8 @@ async function displayEpisodePanel(index, animindex) {
     episodeinfo = animeinfo["downloaded"][index]
 
     episodePanel.innerHTML = `
-        <img id="closeepanel" src="close-icon.png" onclick="hideEpisodePanel()">
-        <img id="deleteepisode" src="trash.png" onclick="deleteEpisode(${index}, ${animindex})">
+        <img id="closeepanel" src="icons/close-icon.png" onclick="hideEpisodePanel()">
+        <img id="deleteepisode" src="icons/trash.png" onclick="deleteEpisode(${index}, ${animindex})">
         <br></br>
         <p id="epinfo">Filename: <span id="filename">${episodeinfo["name"]}</span></div>
         <p id="epinfo">Located in: <span id="path">${episodeinfo["path"]}</span</div>
@@ -367,12 +424,12 @@ async function displayAnimeEpisodes(index) {
 
     var deleteButton = document.createElement('img')
     deleteButton.id = "deletebutton"
-    deleteButton.src = "trash.png"
+    deleteButton.src = "icons/trash.png"
     deleteButton.onclick = function () { deleteAnime(index) }
 
     var settingsbutton = document.createElement('img');
     settingsbutton.id = "animesettingsbutton"
-    settingsbutton.src = "anime-settings-icon.png"
+    settingsbutton.src = "icons/anime-settings-icon.png"
     settingsbutton.onclick = function () { displaySettingsAnime(index) }
 
     var topdiv = document.createElement('div')
@@ -431,7 +488,7 @@ async function displayAppSettings() {
     let interval = document.getElementsByName("interval")[0];
 
     address.value = await fetchSetting("qbittorrent_address")
-    port.value =  parseInt(await fetchSetting("qbittorrent_port"))
+    port.value = parseInt(await fetchSetting("qbittorrent_port"))
     login.value = await fetchSetting("qbittorrent_login")
     password.value = await fetchSetting("qbittorrent_password")
     interval.value = parseInt(await fetchSetting("update_interval"))
@@ -452,4 +509,42 @@ async function displayAppSettings() {
         await changeSetting("qbittorrent_password", password.value)
         await changeSetting("update_interval", Math.ceil(interval.value))
     })
+}
+
+async function nyaaResults(searchWord, filterlist = [], requirelist = []) {
+
+    let results = []
+
+    let searchresults = await si.searchAll(searchWord, {
+        category: '1_0'
+    })
+
+    for(const result of searchresults){
+        let filtered = false
+
+        filterlist.every(filterword => {
+            if (result["name"].includes(filterword)) {
+                filtered = true
+                return false;
+            }
+        })
+
+        requirelist.every(requireword => {
+            if (!result["name"].includes(requireword)) {
+                filtered = true;
+                return false;
+            }
+        })
+
+        if (!filtered) {
+            results.push(result)
+        }
+    }
+    console.log(results)
+
+    return results
+}
+
+async function checkAnimes() {
+    
 }
