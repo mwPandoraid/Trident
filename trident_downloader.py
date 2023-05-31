@@ -2,6 +2,7 @@ from NyaaPy.nyaa import Nyaa
 from qbittorrent import Client
 import json
 from datetime import datetime
+import time
 
 
 nyaa = Nyaa()
@@ -29,12 +30,16 @@ def update():
 
     for index, anime in enumerate(anilist["animes"]):
         searchword = anime["searchword"]
-        results = nyaa.search(keyword=searchword, category=1)
+        time.sleep(0.5) #don't spam nyaa.si with requests
         print("Searching for " + searchword)
+
+        results = nyaa.search(keyword=searchword, category=1)
+        
         print("Found results: " + str(len(results)))
         for torrent in results:
             episode = torrent.__dict__
-            if anime["quality"] in episode["name"] and episode["id"] not in str(anime["downloaded"]):
+            if anime["quality"] in episode["name"] and episode["id"] not in str(anime["downloaded"]) and episode["id"] not in str(downloading):
+
                 filtered = False
                 for filterword in anime["filter"]:
                     if filterword in episode["name"]:
@@ -50,13 +55,16 @@ def update():
                     print("Skipping.")
                     continue
                 
-
+                    
                 path = anilist["path"] + "\\" + anime["fullname"]
                 qb.download_from_link(episode["magnet"], savepath=path, category=episode["name"])  #we create the category here so we can easily access the filename
+                
                 createdcategories.append(episode["name"])
                 torrents = qb.torrents(category=episode["name"])
+                
                 infohashes.append(torrents[0]["infohash_v1"])
 
+                print("we're here " + episode["name"])
                 #Wait for the metadata to finish downloading so we can get torrent files.
                 while qb.torrents(category=episode["name"])[0]["state"] == "metaDL":
                     pass

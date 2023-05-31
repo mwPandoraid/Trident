@@ -16,7 +16,7 @@ const createWindow = () => {
         hasShadow:      false,
         title:          "Loading..."
     });
-    loadingWindow.loadURL('file://' + __dirname + '/close-icon.png');
+    loadingWindow.loadURL('file://' + __dirname + 'icons/close-icon.png');
     
     const win = new BrowserWindow({
         width: 800,
@@ -27,6 +27,7 @@ const createWindow = () => {
         },
         show: false
     })
+    win.setMenuBarVisibility(false)
     win.webContents.once('did-finish-load', function ()
     {
         win.show();

@@ -29,6 +29,7 @@ function startDownloader() {
         console.log("Running task.")
         let python = spawn("python3", ['trident_downloader.py']);
         let refreshButton = document.getElementsByName("refreshbutton")[0];
+        let dataToSend;
         refreshButton.style.animation = "rotation 2s infinite linear";
         python.stdout.on('data', function (data) {
             console.log('Pipe data from python script ...');
@@ -118,6 +119,43 @@ async function listAnime() {
 listAnime()
 console.log(__dirname)
 
+async function displayTorrentBox() {
+    console.log("Searching");
+    let searchword = document.getElementsByName("searchword")[0].value
+
+    let filter = document.getElementsByName("filter")[0].value;
+    let require = document.getElementsByName("require")[0].value;
+
+    let filterlist = []
+
+    if (filter.length !== 0) {
+        filterlist = filter.split(",")
+    }
+
+    let requirelist = []
+
+    if (require.length !== 0) {
+        requirelist = require.split(',')
+    }
+
+    let results = await nyaaResults(searchword, filterlist, requirelist)
+    console.log(results)
+    console.log(results.length)
+
+    let torrentbox = document.createElement("div")
+    torrentbox.className = "torrentbox"
+
+    results.forEach(result => {
+        let resultElement = document.createElement("p")
+        console.log(result["name"])
+        resultElement.innerText = result["name"]
+
+        torrentbox.appendChild(resultElement)
+    })
+
+    document.getElementById("content").appendChild(torrentbox)
+}
+
 async function addAnimeMenu() {
     document.getElementById("content").innerHTML = `
         <div style="width: 40%; float: left">
@@ -137,42 +175,7 @@ async function addAnimeMenu() {
     submit.addEventListener("click", addAnimeToList)
 
     let check = document.getElementsByName("check")[0];
-    check.addEventListener("click", async () => {
-        console.log("Searching");
-        let searchword = document.getElementsByName("searchword")[0].value
-
-        let filter = document.getElementsByName("filter")[0].value;
-        let require = document.getElementsByName("require")[0].value;
-
-        let filterlist = []
-
-        if (filter.length !== 0) {
-            filterlist = filter.split(",")
-        }
-
-        let requirelist = []
-
-        if (require.length !== 0) {
-            requirelist = require.split(',')
-        }
-
-        let results = await nyaaResults(searchword, filterlist, requirelist)
-        console.log(results)
-        console.log(results.length)
-
-        let torrentbox = document.createElement("div")
-        torrentbox.className = "torrentbox"
-
-        results.forEach(result => {
-            let resultElement = document.createElement("p")
-            console.log(result["name"])
-            resultElement.innerText = result["name"]
-
-            torrentbox.appendChild(resultElement)
-        })
-
-        document.getElementById("content").appendChild(torrentbox)
-    })
+    check.addEventListener("click", displayTorrentBox)
 }
 
 async function addAnimeToList() {
@@ -342,6 +345,7 @@ async function displayTorrentMenu() {
 async function displaySettingsAnime(index) {
 
     document.getElementById("content").innerHTML = `
+    <div style="width: 40%; float: left">
     <h1>Settings for <span id="animename"></span></h1>
     <label> Name: <input type="text" id="textbox" name="name"></input> </label>
     <label> Searchword: <input type="text" id="textbox" name="searchword"></input> </label>
@@ -350,6 +354,8 @@ async function displaySettingsAnime(index) {
     <label> Background (optional): <br><input type="file" name="image" accept="image/png, image/gif, image/jpeg"></input> </label>
     <br></br>
     <button id="textbox" name="submit">Submit</button>
+    <button id="textbox" name="check">Check</button>
+    </div>
     `
 
     let name = document.getElementsByName("name")[0];
@@ -375,22 +381,17 @@ async function displaySettingsAnime(index) {
 
         console.log("clicked")
 
-        let filterlist = ""
-        if (filter.length !== 0) {
+        let filterlist = []
+
+        if (filter.value.length !== 0) {
             filterlist = filter.value.split(",")
-        } else {
-            filterlist = []
         }
 
-        let requirelist = ""
-        if (require.length !== 0) {
+        let requirelist = []
+
+        if (require.value.length !== 0) {
             requirelist = require.value.split(',')
-        } else {
-            requirelist = []
         }
-
-        console.log(filterlist)
-        console.log(requirelist)
 
         animeinfo["searchword"] = searchword.value;
         animeinfo["filter"] = filterlist
@@ -404,9 +405,10 @@ async function displaySettingsAnime(index) {
         await fs.writeFile("anilist.json", JSON.stringify(json))
         console.log('Edited anime settings.');
         listAnime()
-
-
     })
+
+    let check = document.getElementsByName("check")[0];
+    check.addEventListener("click", displayTorrentBox)
 }
 
 async function displayAnimeEpisodes(index) {
@@ -519,7 +521,7 @@ async function nyaaResults(searchWord, filterlist = [], requirelist = []) {
         category: '1_0'
     })
 
-    for(const result of searchresults){
+    for (const result of searchresults) {
         let filtered = false
 
         filterlist.every(filterword => {
@@ -546,5 +548,27 @@ async function nyaaResults(searchWord, filterlist = [], requirelist = []) {
 }
 
 async function checkAnimes() {
-    
+    let data = await fs.readFile('anilist.json')
+    let json = JSON.parse(data)
+
+    data = await fs.readFile('downloading.json')
+    let downloading = JSON.parse(data)
+
+    for (anime of json["animes"]) {
+        let results = await nyaaResults(anime["searchword"],
+            anime["filter"],
+            anime["require"])
+
+        for(let result of results){ 
+            //if anime["quality"] in episode["name"] and episode["id"] not in str(anime["downloaded"]) and episode["id"] not in str(downloading):
+            if(!anime["downloaded"].includes(result["id"]) && !downloading.includes(result["id"])) {
+                path = json["path"] + "\\" + anime["fullname"]
+                
+                downloading[result["hash"]] = {"id": result["id"], "name": filename, "path": path, "watched": False, "animeindex": index}
+                
+            }
+        }
+    }
 }
+
+checkAnimes()
